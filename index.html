@@ -100,11 +100,19 @@
             }
             span:nth-of-type(2n)
             {
-                background-color: #FC9;
+                background-color: #F93;
             }
             span:nth-of-type(2n + 1)
             {
-                background-color: #F93;
+                background-color: #C60;
+            }
+            span.center:nth-of-type(2n)
+            {
+                background-color: #630;
+            }
+            span.center:nth-of-type(2n + 1)
+            {
+                background-color: #000;
             }
             label
             {
@@ -193,7 +201,7 @@
             }
 
             /* 1番下の文字 */
-            #footer
+            #title
             {
                 color: #666;
                 line-height: 3em;
@@ -249,7 +257,7 @@
         <div id="main">
             <canvas id="wave" width="128" height="64"></canvas>
             <div id="fm"></div>
-            <div id="footer">FM音源のおもちゃ</div>
+            <div id="title">FM音源のおもちゃ</div>
             <div id="piano"></div>
         </div>
 
@@ -265,6 +273,7 @@
                 radio: [],
                 label: [],
                 key: [],
+                title: document.querySelector('#title'),
             }
 
             // 音声
@@ -312,7 +321,7 @@
             {
                 w: 15,
                 h: 8,
-                cx: 7,
+                cx: 0,
                 cy: 7,
             }
 
@@ -325,36 +334,22 @@
 
             const callback =
             {
-                // 鍵盤を押した
-                downWave: (event) =>
-                {
-                    if(
-                        event.type !== 'touchstart' &&
-                        event.type !== 'touchmove' &&
-                        !(event.buttons & 1)
-                    ) return
-
-                    event.stopPropagation()
-                    event.preventDefault()
-
-                    if(!input.play) func.play()
-                    input.play = true
-                },
                 // FMのグリッドを押した
                 downLabel: (event) =>
                 {
-                    const target = event.target
-                    let label
+                    const target = event.currentTarget
 
-                    if(target.tagName === 'LABEL')
-                    {
-                        label = target
-                    }
-                    else if(target.tagName === 'SPAN')
-                    {
-                        label = document.querySelector('#' + target.id + ' > label')
-                    }
-                    else return
+                    let px = -1, py = -1
+                    if(event.clientX != undefined) px = event.clientX
+                    if(event.clientY != undefined) py = event.clientY
+                    if(event.targetTouches != undefined) px = event.targetTouches[0].clientX
+                    if(event.targetTouches != undefined) py = event.targetTouches[0].clientY
+
+                    const rect = target.getBoundingClientRect()
+                    const lx = Math.floor((px - rect.left) / rect.width * fm.w)
+                    const ly = Math.floor((py - rect.top) / rect.height * fm.h)
+
+                    const label = document.querySelector('#label-' + ly + '-' + lx)
 
                     if(
                         event.type !== 'touchstart' &&
@@ -368,8 +363,8 @@
                     label.click()
 
                     const match = /label-(\d+)-(\d+)/.exec(label.id)
-                    const y = parseInt(match[1]) - fm.cy
-                    const x = parseInt(match[2]) - fm.cx
+                    const y = (parseInt(match[1]) - fm.cy) / 2
+                    const x = (parseInt(match[2]) - fm.cx) / 2
 
                     input.fm.amp = y
                     input.fm.freq = x
@@ -396,17 +391,9 @@
 
                     input.play = false
                 },
-                // 鍵盤を押した
-                downKey: (event) =>
+                // 波を押した
+                downWave: (event) =>
                 {
-                    const target = event.target
-
-                    let prevTarget = null
-                    if(input.piano.step >= 0 && input.piano.key >= 0)
-                        prevTarget = document.querySelector('#key-' + input.piano.step + '-' + input.piano.key)
-
-                    if(target.tagName !== 'INPUT') return
-
                     if(
                         event.type !== 'touchstart' &&
                         event.type !== 'touchmove' &&
@@ -416,12 +403,77 @@
                     event.stopPropagation()
                     event.preventDefault()
 
-                    if(prevTarget != null && prevTarget.classList.contains('down')) prevTarget.classList.remove('down')
-                    if(!target.classList.contains('down')) target.classList.add('down')
+                    if(!input.play) func.play()
+                    input.play = true
+                },
+                // 鍵盤を押した
+                downKey: (event) =>
+                {
+                    if(
+                        event.type !== 'touchstart' &&
+                        event.type !== 'touchmove' &&
+                        !(event.buttons & 1)
+                    ) return
 
+                    const target = event.currentTarget
+
+                    let current = null, prev = null
+                    if(input.piano.step >= 0 && input.piano.key >= 0)
+                        prev = document.querySelector('#key-' + input.piano.step + '-' + input.piano.key)
+
+                    // ポインターの位置を取得
+                    let px = -1, py = -1
+                    if(event.clientX != undefined) px = event.clientX
+                    if(event.clientY != undefined) py = event.clientY
+                    if(event.targetTouches != undefined) px = event.targetTouches[0].clientX
+                    if(event.targetTouches != undefined) py = event.targetTouches[0].clientY
+                
+                    // 鍵盤全体の矩形を取得
+                    const rect = target.getBoundingClientRect()
+                    let x = -1, k = -1, s = -1
+                    let wb = Math.floor((py - rect.top) / rect.height * piano.step * 2)
+
+                    // 白鍵
+                    if(wb % 2 === 1)
+                    {
+                        x = Math.floor((px - rect.left) / rect.width * 7)
+                        s = Math.floor((py - rect.top) / rect.height * piano.step)
+
+                        if(x === 0) k = 0
+                        if(x === 1) k = 2
+                        if(x === 2) k = 4
+                        if(x === 3) k = 5
+                        if(x === 4) k = 7
+                        if(x === 5) k = 9
+                        if(x === 6) k = 11
+                    }
+                    // 黒鍵
+                    else
+                    {
+                        x = Math.floor((px - rect.left) / rect.width * 7 - 0.5)
+                        s = Math.floor((py - rect.top) / rect.height * piano.step)
+
+                        if(x === 0) k = 1
+                        if(x === 1) k = 3
+                        if(x === 3) k = 6
+                        if(x === 4) k = 8
+                        if(x === 5) k = 10
+                    }
+
+                    if(s >= 0 && k >= 0)
+                        current = document.querySelector('#key-' +s + '-' + k)
+
+                    event.stopPropagation()
+                    event.preventDefault()
+
+                    if(prev != null && prev.classList.contains('down')) prev.classList.remove('down')
+                    if(current != null && !current.classList.contains('down')) current.classList.add('down')
+
+                    /*
                     const match = /key-(\d+)-(\d+)/.exec(target.id)
                     const s = parseInt(match[1])
                     const k = parseInt(match[2])
+                    */
 
                     let update = false
                     if(input.piano.step !== s || input.piano.key !== k) update = true
@@ -429,11 +481,15 @@
                     input.piano.step = s
                     input.piano.key = k
 
-                    if(update) func.updateFreq()
+                    if(k >= 0 && s >= 0 && update) func.updateFreq()
 
-                    if(!input.play) func.play()
+                    if(k >= 0 && s >= 0 && !input.play)
+                    {
+                        func.play()
+                        input.play = true
+                    }
 
-                    input.play = true
+                    target.blur()
                 },
                 // 鍵盤を離した
                 upKey: (event) =>
@@ -459,6 +515,33 @@
                     event.stopPropagation()
                     event.preventDefault()
 
+                    func.start()
+
+                    element.start.classList.add('none')
+                },
+                visibility: (event) =>
+                {
+                    const state = document.visibilityState
+                    if (state === 'hidden') audio.context.close()
+                    if (state === 'visible' && element.start.classList.contains('none'))
+                    {
+                        element.start.classList.remove('none')
+                    }
+                },
+                // 動作キャンセル
+                cancel: (event) =>
+                {
+                    event.stopPropagation()
+                    event.preventDefault()
+                    return false
+                }
+            }
+
+            const func =
+            {
+                // 音声開始
+                start: () =>
+                {
                     audio.context = new AudioContext()
 
                     audio.gain = audio.context.createGain()
@@ -474,30 +557,7 @@
                     audio.source.connect(audio.gain)
                     audio.source.loop = true
                     audio.source.start()
-
-                    /*
-                    audio.sample
-                    audio.oscillator = audio.context.createOscillator()
-                    audio.oscillator.type = 'custom'
-                    audio.oscillator.frequency.setValueAtTime(440, audio.context.currentTime)
-                    audio.oscillator.connect(audio.gain)
-                    audio.oscillator.start()
-                    */
-
-                    start.classList.add('none')
-                    main.classList.remove('none')
                 },
-                // 動作キャンセル
-                cancel: (event) =>
-                {
-                    event.stopPropagation()
-                    event.preventDefault()
-                    return false
-                }
-            }
-
-            const func =
-            {
                 // FM波形を計算
                 fm: (time, modulationAmp, modulationFreq) =>
                 {
@@ -556,6 +616,7 @@
                 init: () =>
                 {
                     // ボタン外タップ禁止
+                    /*
                     document.addEventListener('mousedown', callback.cancel, { passive: false })
                     document.addEventListener('touchstart', callback.cancel, { passive: false })
                     document.addEventListener('mousemove', callback.cancel, { passive: false })
@@ -564,6 +625,7 @@
                     document.addEventListener('selectstart', callback.cancel, { passive: false })
                     // ダブルタップ禁止
                     document.addEventListener('dblclick', callback.cancel, { passive: false })
+                    */
 
                     // FM各グリッドごとに行う
                     for(let y = 0; y < fm.h; y++)
@@ -588,6 +650,9 @@
                             const label = document.createElement('label')
                             label.htmlFor = radioId
                             label.id = labelId
+
+                            if(x === 0 || y === 7)
+                                span.classList.add('center')
 
                             span.append(radio)
                             span.append(label)
@@ -657,14 +722,20 @@
                             input.piano[s * 12 + k] = -1
                         }
                     }
+                    document.addEventListener('visibilitychange', callback.visibility)
+
                     element.wave.addEventListener('mousedown', callback.downWave)
                     element.wave.addEventListener('touchstart', callback.downWave)
 
                     element.fm.addEventListener('mousedown', callback.downLabel)
                     element.fm.addEventListener('touchstart', callback.downLabel)
+                    element.fm.addEventListener('mousemove', callback.downLabel)
+                    element.fm.addEventListener('touchmove', callback.downLabel)
 
                     element.piano.addEventListener('mousedown', callback.downKey)
                     element.piano.addEventListener('touchstart', callback.downKey)
+                    element.piano.addEventListener('mousemove', callback.downKey)
+                    element.piano.addEventListener('touchmove', callback.downKey)
 
                     // 離した
                     document.addEventListener('mouseup', callback.upLabel)
