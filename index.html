@@ -255,7 +255,7 @@
             <h1>FM音源のおもちゃ</h1>
         </div>
         <div id="main">
-            <canvas id="wave" width="128" height="64"></canvas>
+            <canvas id="wave" width="256" height="128"></canvas>
             <div id="fm"></div>
             <div id="title">FM音源のおもちゃ</div>
             <div id="piano"></div>
@@ -283,8 +283,7 @@
                 source: null,
                 gain: null,
                 buffer: null,
-                sample: null,
-                volume: 0.05,
+                volume: 0.5,
             }
 
             // 入力
@@ -364,15 +363,18 @@
 
                     const match = /label-(\d+)-(\d+)/.exec(label.id)
                     const y = (parseInt(match[1]) - fm.cy) / 2
-                    const x = (parseInt(match[2]) - fm.cx) / 2
+                    const x = (parseInt(match[2]) - fm.cx)
 
-                    input.fm.amp = y
-                    input.fm.freq = x
+                    if(input.fm.y !== y || input.fm.x !== x) {
+                        input.fm.amp = y
+                        input.fm.freq = x
 
-                    if(input.fm.y !== y || input.fm.x !== x) func.updateWave()
+                        func.updateWave()
 
-                    input.fm.y = y
-                    input.fm.x = x
+                        input.fm.y = y
+                        input.fm.x = x
+                    }
+
 
                     input.fm.down = true
 
@@ -522,7 +524,7 @@
                 visibility: (event) =>
                 {
                     const state = document.visibilityState
-                    if (state === 'hidden') audio.context.close()
+                    if (state === 'hidden' && !element.start.classList.contains('none')) audio.context.close()
                     if (state === 'visible' && element.start.classList.contains('none'))
                     {
                         element.start.classList.remove('none')
@@ -548,15 +550,7 @@
                     audio.gain.gain.value = 0
                     audio.gain.connect(audio.context.destination)
 
-                    audio.buffer = audio.context.createBuffer(1, wave.w, wave.w * 440)
-                    audio.sample = audio.buffer.getChannelData(0)
                     func.updateWave()
-
-                    audio.source = audio.context.createBufferSource()
-                    audio.source.buffer = audio.buffer
-                    audio.source.connect(audio.gain)
-                    audio.source.loop = true
-                    audio.source.start()
                 },
                 // FM波形を計算
                 fm: (time, modulationAmp, modulationFreq) =>
@@ -575,21 +569,34 @@
                     context2d.fillStyle = '#0000CC'
                     context2d.fillRect(0, 0, wave.w, wave.h)
 
+                    if(audio.source != null) {
+                        audio.source.disconnect()
+                        audio.source = null
+                    }
+                    audio.source = audio.context.createBufferSource()
+                    audio.buffer = audio.context.createBuffer(1, wave.w, wave.w * 440)
+
                     // 波形を計算
+                    const channelData = audio.buffer.getChannelData(0)
                     for(let s = 0; s < wave.w; s++)
                     {
-                        audio.sample[s] = func.fm(s / wave.w, input.fm.amp, input.fm.freq)
+                        channelData[s] = func.fm(s / wave.w, input.fm.amp, input.fm.freq)
                     }
 
                     // 草を描画
                     context2d.fillStyle = '#00CC00'
                     for(let i = 0; i < wave.w; i++)
                     {
-                        const s = audio.sample[i]
+                        const s = channelData[i]
                         const y = Math.round(((1 - (s / 2 + 0.5)) / 2 + 0.25) * wave.h)
                         const h = Math.round(((s / 2 + 0.5) / 2 + 0.5) * wave.h)
                         context2d.fillRect(i, y, 1, h)
                     }
+                    
+                    audio.source.buffer = audio.buffer
+                    audio.source.loop = true
+                    audio.source.connect(audio.gain)
+                    audio.source.start(0)
                 },
                 // ピアノの別の鍵盤を押した
                 updateFreq: () =>
@@ -603,7 +610,6 @@
                 // 音開始
                 play: () =>
                 {
-                    //audio.gain.gain.cancelScheduledValues(audio.context.currentTime)
                     audio.gain.gain.linearRampToValueAtTime(audio.volume, audio.context.currentTime + 0.01)
                 },
                 // 音停止
@@ -746,6 +752,9 @@
                     // 開始
                     start.addEventListener('mouseup', callback.start)
                     start.addEventListener('touchend', callback.start)
+                    //start.addEventListener('click', callback.start)
+                    //start.addEventListener('mousedown', callback.start)
+                    //start.addEventListener('touchstart', callback.start)
 
                     // 空描画
                     context2d.fillStyle = '#0000CC'
